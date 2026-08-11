@@ -32,8 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Two ways to read foreign chat:
@@ -60,8 +58,13 @@ public final class IncomingChatHandler {
 
     private static final String HINT = "Hover to translate → English (Lingo)";
 
-    private static final Pattern SENDER_PREFIX =
-            Pattern.compile("^\\s*(<[^<>]{1,32}>|\\[[^\\[\\]]{1,32}])\\s*");
+    /**
+     * Trailing handle that carries our hover/click. Servers commonly wrap a whole chat
+     * line in their own hover/click, and a sibling style wins over the parent's for
+     * every field it sets — so an event on the wrapper alone is unreachable on those
+     * lines. This sibling is ours, so it always resolves to us.
+     */
+    private static final String HANDLE = " ⇄";
 
     private static final long ON_DEVICE_TIMEOUT_SECONDS = 90;
     private static final long REMOTE_TIMEOUT_SECONDS = 30;
@@ -123,7 +126,7 @@ public final class IncomingChatHandler {
                 return message;
             }
             String rendered = message.getString();
-            return prepare(message.copy(), splitSenderPrefix(rendered).body(), rendered);
+            return prepare(message.copy(), ChatLineSplitter.split(rendered).body(), rendered);
         });
 
         ClientReceiveMessageEvents.ALLOW_CHAT.register(
@@ -218,9 +221,15 @@ public final class IncomingChatHandler {
                 new AtomicBoolean(false));
         PENDING.put(id, pending);
 
-        holder.setStyle(holder.getStyle()
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal(HINT)))
-                .withClickEvent(new ClickEvent.Custom(CLICK_ID, Optional.of(StringTag.valueOf(id)))));
+        HoverEvent hover = new HoverEvent.ShowText(Component.literal(HINT));
+        ClickEvent click = new ClickEvent.Custom(CLICK_ID, Optional.of(StringTag.valueOf(id)));
+
+        // On a plainly styled line the wrapper's style is inherited by every character,
+        // so the whole line stays hoverable as before.
+        holder.setStyle(holder.getStyle().withHoverEvent(hover).withClickEvent(click));
+        holder.append(Component.literal(HANDLE)
+                .withStyle(ChatFormatting.GRAY)
+                .withStyle(style -> style.withHoverEvent(hover).withClickEvent(click)));
 
         maybeStartAuto(pending);
         return holder;
@@ -365,8 +374,15 @@ public final class IncomingChatHandler {
         pending.tooltip().set("Original: " + pending.body());
         pending.status().set(Status.DONE);
         runOnClientThread(() -> {
-            pending.display().append(Component.literal(" → " + english)
-                    .withStyle(ChatFormatting.GRAY));
+            Component translated = Component.literal(" → " + english)
+                    .withStyle(ChatFormatting.GRAY);
+            // Keep the translate handle last so it stays a stable target to hover.
+            var siblings = pending.display().getSiblings();
+            if (siblings.isEmpty()) {
+                pending.display().append(translated);
+            } else {
+                siblings.add(siblings.size() - 1, translated);
+            }
             Minecraft minecraft = Minecraft.getInstance();
             if (minecraft != null && minecraft.gui != null) {
                 // Lines are wrapped into render buffers when added; this re-reads them.
@@ -393,20 +409,6 @@ public final class IncomingChatHandler {
                             + " the cached model may be corrupt",
                     sourceLanguage, TARGET_LANGUAGE, failures);
         }
-    }
-
-    private record ChatLine(String prefix, String body) {
-    }
-
-    private static ChatLine splitSenderPrefix(String rendered) {
-        Matcher matcher = SENDER_PREFIX.matcher(rendered);
-        if (matcher.find()) {
-            String body = rendered.substring(matcher.end());
-            if (!body.isBlank()) {
-                return new ChatLine(matcher.group(1) + " ", body);
-            }
-        }
-        return new ChatLine("", rendered);
     }
 
     private static void runOnClientThread(Runnable action) {

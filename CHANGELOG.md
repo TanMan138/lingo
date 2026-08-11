@@ -2,6 +2,20 @@
 
 All notable changes to Lingo. Versions follow [semantic versioning](https://semver.org/).
 
+## [1.1.6]
+
+### Fixed
+
+- Chat on servers that put their own hover or click on a whole message line (most
+  minigame servers, e.g. BedWars global chat) could not be translated at all —
+  hovering showed the server's tooltip and nothing else, because the server's own
+  style hid Lingo's. Every translatable line now ends with a small grey `⇄` handle:
+  hover or click that to translate. The server's own name clicks keep working.
+- The sender decoration was being translated along with the message. A line like
+  `[Global] [GOLD] [detemo head]detemo → текст` sent the channel, rank, and name to
+  the translator, which pushed language detection towards English on short messages
+  and, on a paid service, billed characters for text nobody reads.
+
 ## [1.1.5]
 
 ### Added
