@@ -6,6 +6,10 @@
 name: build
 on: [pull_request, push]
 
+# This workflow only reads the repository; releases do their own publishing.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
