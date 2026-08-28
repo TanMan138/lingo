@@ -2,6 +2,17 @@
 
 All notable changes to Lingo. Versions follow [semantic versioning](https://semver.org/).
 
+## [1.1.7]
+
+### Fixed
+
+- Romanized chat (Hindi, Russian, and similar languages typed in Latin letters
+  instead of their native script) often failed to translate — the on-device
+  language detector either missed it entirely or, worse, confidently guessed the
+  wrong Latin-script language (Dutch, Swedish, etc.) and translated from that
+  instead. Cloud backends (DeepL, Google, Langbly, Ollama) now fall back to their
+  own auto-detect for these cases rather than trusting a bad local guess.
+
 ## [1.1.6]
 
 ### Fixed
