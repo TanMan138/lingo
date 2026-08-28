@@ -76,7 +76,7 @@ dependencies {
 	implementation include("org.jetbrains:annotations:13.0")
 	implementation include("com.squareup.moshi:moshi:1.13.0")
 	implementation include("com.squareup.moshi:moshi-kotlin:1.13.0")
-	implementation include("com.squareup.okio:okio:2.10.0")
+	implementation include("com.squareup.okio:okio:3.4.0")
 	// Script → Latin romanization for outgoing chat on English-only servers
 	implementation include("com.ibm.icu:icu4j:${project.icu4j_version}")
 
