@@ -278,16 +278,37 @@ public final class IncomingChatHandler {
         try {
             ProtectedSpans.Masked masked = ProtectedSpans.mask(body);
             Optional<String> detected = detector.detect(ProtectedSpans.unwrap(body));
-            if (detected.isEmpty()) {
+            String sourceLanguage;
+            if (detected.isPresent()) {
+                sourceLanguage = detected.get();
+
+                // Only an explicit hover retargets outgoing chat — otherwise every passing
+                // lobby message would change the language the player replies in. This uses
+                // the raw guess even when it's a Latin-script one below, since "auto" isn't
+                // a valid reply-target language.
+                if (!auto) {
+                    String detectedLanguage = sourceLanguage;
+                    runOnClientThread(() -> state.onLanguageDetected(detectedLanguage));
+                }
+
+                // A Latin-script guess can't be trusted: Lingua can't tell real French
+                // from Russian/Hindi/Arabic typed in Latin letters. Remote backends carry
+                // their own, better-trained detector, so let them re-decide instead of
+                // translating from a possibly wrong source language. On-device has no
+                // such fallback and must run with the guess as-is.
+                if (translationService.isRemoteBackend()
+                        && LanguageDetector.isLatinScriptGuess(sourceLanguage)) {
+                    sourceLanguage = "auto";
+                }
+            } else if (translationService.isRemoteBackend()) {
+                // Local script/n-gram detection misses romanized text (e.g. Hindi typed
+                // in Latin letters). Cloud backends and Ollama can still make a call on
+                // it themselves, so hand off with an unresolved source instead of giving
+                // up. On-device has no generic "auto" model, so it still bails below.
+                sourceLanguage = "auto";
+            } else {
                 give(pending, "Couldn't detect a language (English or too short).");
                 return;
-            }
-            String sourceLanguage = detected.get();
-
-            // Only an explicit hover retargets outgoing chat — otherwise every passing
-            // lobby message would change the language the player replies in.
-            if (!auto) {
-                runOnClientThread(() -> state.onLanguageDetected(sourceLanguage));
             }
 
             if (translationService.requiresModelDownload()) {

@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class LanguageDetector {
 
@@ -51,6 +52,41 @@ public class LanguageDetector {
             Language.VIETNAMESE,
             Language.THAI
     );
+
+    /**
+     * Languages that share Latin script with English. Lingua's n-gram model can't tell
+     * "this is actually French" from "this is Russian/Hindi/Arabic typed in Latin
+     * letters (romanized) instead of its native script" — both look like Latin text to
+     * it, and it will confidently pick one of these even when wrong. Callers with a
+     * more capable remote detector should treat a guess from this set as unreliable
+     * rather than trusting it outright.
+     */
+    private static final Set<Language> LATIN_SCRIPT = Set.of(
+            Language.FRENCH,
+            Language.GERMAN,
+            Language.SPANISH,
+            Language.PORTUGUESE,
+            Language.ITALIAN,
+            Language.DUTCH,
+            Language.POLISH,
+            Language.TURKISH,
+            Language.SWEDISH,
+            Language.CZECH,
+            Language.FINNISH,
+            Language.HUNGARIAN,
+            Language.ROMANIAN,
+            Language.INDONESIAN,
+            Language.VIETNAMESE
+    );
+
+    private static final Set<String> LATIN_SCRIPT_ISO_CODES = LATIN_SCRIPT.stream()
+            .map(language -> language.getIsoCode639_1().toString().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toUnmodifiableSet());
+
+    /** True when {@code isoCode} is a guess this detector can't distinguish from romanized text. */
+    public static boolean isLatinScriptGuess(String isoCode) {
+        return LATIN_SCRIPT_ISO_CODES.contains(isoCode);
+    }
 
     private final com.github.pemistahl.lingua.api.LanguageDetector delegate;
 
